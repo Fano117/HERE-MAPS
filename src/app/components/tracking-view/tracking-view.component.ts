@@ -186,6 +186,8 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
     this.trackingActive = true;
     this.trackingError = '';
 
+    this.startSimulation();
+
     this.trackingSubscription = interval(5000).subscribe(() => {
       this.fetchLocationUpdate();
     });
@@ -195,6 +197,7 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
 
   stopTracking(): void {
     this.trackingActive = false;
+    this.stopSimulation();
     if (this.trackingSubscription) {
       this.trackingSubscription.unsubscribe();
       this.trackingSubscription = null;
@@ -326,5 +329,29 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c;
+  }
+
+  private startSimulation(): void {
+    this.http.get(`http://localhost:3000/api/simulation/start/${this.selectedDriverId}`)
+      .subscribe({
+        next: (response: any) => {
+          if (!response.success && response.message !== 'Simulación ya está activa') {
+            this.trackingError = 'Error al iniciar la simulación';
+          }
+        },
+        error: (error) => {
+          this.trackingError = 'Error de conexión con el servidor';
+        }
+      });
+  }
+
+  private stopSimulation(): void {
+    if (this.selectedDriverId) {
+      this.http.get(`http://localhost:3000/api/simulation/stop/${this.selectedDriverId}`)
+        .subscribe({
+          error: (error) => {
+          }
+        });
+    }
   }
 }
