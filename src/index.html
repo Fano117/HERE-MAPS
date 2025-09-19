@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>HERE Maps Angular</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" rel="stylesheet" type="text/css" />
+  <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+  <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+  <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
+  <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
+  <script>
+    function checkHereMapsReady() {
+      return typeof H !== 'undefined' && 
+             H && 
+             H.service && 
+             H.service.Platform && 
+             H.Map && 
+             H.mapevents && 
+             H.mapevents.Behavior && 
+             H.ui && 
+             H.ui.UI && 
+             H.map && 
+             H.map.Marker &&
+             H.map.Icon;
+    }
+
+    function waitForHereMaps() {
+      if (checkHereMapsReady()) {
+        window.hereMapsReady = true;
+        return;
+      }
+      setTimeout(waitForHereMaps, 100);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', waitForHereMaps);
+    } else {
+      waitForHereMaps();
+    }
+  </script>
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>

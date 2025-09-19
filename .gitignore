@@ -1,0 +1,23 @@
+node_modules/
+dist/
+*.log
+.env
+.vscode/
+*.tmp
+*.temp
+coverage/
+*.coverage
+
+# Backend
+backend/node_modules/
+backend/dist/
+backend/.env
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
