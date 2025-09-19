@@ -313,21 +313,28 @@ export class HereMapsService {
   async calculateRoute(origin: {lat: number, lng: number}, destination: {lat: number, lng: number}): Promise<any> {
     await this.ensureInitialized();
     
-    const response = await fetch(
-      `https://router.hereapi.com/v8/routes?transportMode=car&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&return=polyline,summary&apikey=${this.API_KEY}`
-    );
+    const url = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&return=polyline,summary&apikey=${this.API_KEY}`;
     
-    if (!response.ok) {
-      throw new Error('Error al calcular la ruta');
+    try {
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Response Error:', response.status, errorText);
+        throw new Error(`API Error: ${response.status} - ${errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.routes && data.routes.length > 0) {
+        return data.routes[0];
+      }
+      
+      throw new Error('No se encontraron rutas en la respuesta de la API');
+    } catch (error) {
+      console.error('Error en calculateRoute:', error);
+      throw error;
     }
-    
-    const data = await response.json();
-    
-    if (data.routes && data.routes.length > 0) {
-      return data.routes[0];
-    }
-    
-    throw new Error('No se pudo calcular la ruta');
   }
 
   async calculateOptimizedRoute(startPoint: {lat: number, lng: number}, waypoints: {lat: number, lng: number}[]): Promise<any> {
@@ -345,8 +352,19 @@ export class HereMapsService {
       throw new Error('No hay waypoints válidos');
     }
     
+    console.log('Calculando ruta optimizada con API para', validWaypoints.length, 'waypoints');
+    
     try {
-      // Calcular ruta simple visitando todos los puntos y regresando
+      // Probar primero con una ruta que incluya todos los waypoints
+      if (validWaypoints.length <= 23) { // HERE API permite hasta 25 waypoints total
+        const optimizedRoute = await this.calculateMultiWaypointRoute(startPoint, validWaypoints);
+        if (optimizedRoute) {
+          console.log('Ruta multi-waypoint calculada exitosamente');
+          return optimizedRoute;
+        }
+      }
+      
+      // Si falla, usar método de segmentos individuales
       const allRouteSegments = [];
       let currentPoint = startPoint;
       
@@ -373,6 +391,53 @@ export class HereMapsService {
     }
   }
 
+  private async calculateMultiWaypointRoute(startPoint: {lat: number, lng: number}, waypoints: {lat: number, lng: number}[]): Promise<any> {
+    try {
+      // Construir la URL con múltiples waypoints usando el formato correcto de HERE API v8
+      const origin = `${startPoint.lat},${startPoint.lng}`;
+      const destination = `${startPoint.lat},${startPoint.lng}`; // Regreso al punto inicial
+      
+      // Crear parámetros de URL con múltiples parámetros 'via'
+      const urlParams = new URLSearchParams({
+        transportMode: 'car',
+        origin: origin,
+        destination: destination,
+        return: 'polyline,summary',
+        apikey: this.API_KEY
+      });
+      
+      // Agregar cada waypoint como un parámetro 'via' separado
+      waypoints.forEach(wp => {
+        urlParams.append('via', `${wp.lat},${wp.lng}`);
+      });
+      
+      const url = `https://router.hereapi.com/v8/routes?${urlParams.toString()}`;
+      
+      console.log('Calculando ruta multi-waypoint:', url);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Multi-waypoint API Response Error:', response.status, errorText);
+        return null; // Retornar null para intentar método alternativo
+      }
+      
+      const data = await response.json();
+      
+      if (data.routes && data.routes.length > 0) {
+        console.log('Ruta multi-waypoint obtenida exitosamente');
+        console.log('Estructura de la ruta:', JSON.stringify(data.routes[0], null, 2));
+        return data.routes[0];
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error en calculateMultiWaypointRoute:', error);
+      return null;
+    }
+  }
+
   private combineRouteSegments(segments: any[]): any {
     if (segments.length === 0) return null;
     
@@ -390,7 +455,7 @@ export class HereMapsService {
     };
   }
 
-  private validateCoordinates(coord: {lat: number, lng: number}): boolean {
+  validateCoordinates(coord: {lat: number, lng: number}): boolean {
     return coord.lat >= -90 && coord.lat <= 90 && 
            coord.lng >= -180 && coord.lng <= 180 &&
            !isNaN(coord.lat) && !isNaN(coord.lng);

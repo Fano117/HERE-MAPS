@@ -446,10 +446,18 @@ export class AddressManagementComponent implements OnInit, AfterViewInit {
     
     return validAddresses.map((address, index) => {
       const section = this.optimizedRoute.sections[index];
+      let distance = 0;
+      let duration = 0;
+      
+      if (section) {
+        distance = section.summary.length || 0;
+        duration = section.summary.duration || 0;
+      }
+      
       return {
         address: address.label,
-        distanceFromPrevious: section ? Math.round(section.summary.length / 1000 * 100) / 100 : 0,
-        timeFromPrevious: section ? Math.round(section.summary.duration / 60) : 0,
+        distanceFromPrevious: Math.round(distance / 1000 * 100) / 100,
+        timeFromPrevious: Math.round(duration / 60),
         coordinates: address.coordinates
       };
     });
@@ -501,11 +509,46 @@ export class AddressManagementComponent implements OnInit, AfterViewInit {
       }))
     };
 
-    this.optimizedRoute = null;
+    this.optimizedRoute = {
+      sections: this.createManualRouteSections(validSavedAddresses),
+      summary: { length: totalDistance, duration: totalTime * 60 }
+    };
     
     this.routeOptimized = true;
     this.validationSuccess = 'Ruta calculada exitosamente (método manual)';
     this.showOptimizedRouteOnMap();
+  }
+
+  private createManualRouteSections(validSavedAddresses: any[]): any[] {
+    if (!this.startingPoint) return [];
+    
+    const sections = [];
+    let currentPoint = this.startingPoint;
+    
+    for (const address of validSavedAddresses) {
+      sections.push({
+        type: 'manual',
+        departure: currentPoint.coordinates,
+        arrival: address.coordinates,
+        summary: {
+          length: this.calculateDistance(currentPoint.coordinates, address.coordinates),
+          duration: Math.ceil(this.calculateDistance(currentPoint.coordinates, address.coordinates) / 1000 * 2.5 + 10) * 60
+        }
+      });
+      currentPoint = address;
+    }
+    
+    sections.push({
+      type: 'manual',
+      departure: currentPoint.coordinates,
+      arrival: this.startingPoint.coordinates,
+      summary: {
+        length: this.calculateDistance(currentPoint.coordinates, this.startingPoint.coordinates),
+        duration: Math.ceil(this.calculateDistance(currentPoint.coordinates, this.startingPoint.coordinates) / 1000 * 2.5 + 10) * 60
+      }
+    });
+    
+    return sections;
   }
 
   private calculateDistance(coord1: any, coord2: any): number {
@@ -559,7 +602,11 @@ export class AddressManagementComponent implements OnInit, AfterViewInit {
     });
 
     if (this.optimizedRoute && this.optimizedRoute.sections) {
+      console.log('Dibujando líneas de ruta con secciones:', this.optimizedRoute.sections.length);
+      console.log('Primera sección:', this.optimizedRoute.sections[0]);
       this.drawRouteLines();
+    } else {
+      console.log('No hay optimizedRoute.sections para dibujar:', this.optimizedRoute);
     }
 
     const validAddressesForBounds = this.savedAddresses.filter(addr => this.isValidCDMXCoordinate(addr.coordinates));
@@ -575,32 +622,63 @@ export class AddressManagementComponent implements OnInit, AfterViewInit {
     }
 
     this.optimizedRoute.sections.forEach((section: any, index: number) => {
-      if (!section || !section.polyline || typeof section.polyline !== 'string') {
-        return;
-      }
+      if (!section) return;
       
       try {
-        const routeCoordinates = this.hereMapsService.decodePolyline(section.polyline);
+        let lineString = new (H as any).geo.LineString();
         
-        if (!Array.isArray(routeCoordinates) || routeCoordinates.length === 0) {
-          return;
-        }
-        
-        const lineString = new (H as any).geo.LineString();
-        let validPointsAdded = 0;
-        
-        routeCoordinates.forEach((coord: any) => {
-          if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && 
-              !isNaN(coord.lat) && !isNaN(coord.lng)) {
-            lineString.pushPoint(coord.lat, coord.lng);
-            validPointsAdded++;
+        if (section.type === 'manual' && section.departure && section.arrival) {
+          const departure = section.departure;
+          const arrival = section.arrival;
+          
+          if (this.hereMapsService.validateCoordinates(departure) && 
+              this.hereMapsService.validateCoordinates(arrival)) {
+            lineString.pushPoint(departure.lat, departure.lng);
+            lineString.pushPoint(arrival.lat, arrival.lng);
+          } else {
+            return;
           }
-        });
+        } else if (section.polyline && typeof section.polyline === 'string') {
+          console.log(`Procesando polyline para sección ${index}:`, section.polyline.substring(0, 50) + '...');
+          
+          // Usar el decodificador nativo de HERE Maps para Flexible Polylines
+          try {
+            console.log('Intentando decodificar con fromFlexiblePolyline...');
+            lineString = (H as any).geo.LineString.fromFlexiblePolyline(section.polyline);
+            console.log('Polyline decodificado exitosamente para sección', index);
+          } catch (decodeError) {
+            console.error('Error decodificando flexible polyline para sección', index, ':', decodeError);
+            console.log('Intentando con decodificador manual...');
+            
+            // Fallback al decodificador manual
+            const routeCoordinates = this.hereMapsService.decodePolyline(section.polyline);
+            
+            if (!Array.isArray(routeCoordinates) || routeCoordinates.length === 0) {
+              console.error('Decodificador manual también falló para sección', index);
+              return;
+            }
+            
+            let validPointsAdded = 0;
+            routeCoordinates.forEach((coord: any) => {
+              if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && 
+                  !isNaN(coord.lat) && !isNaN(coord.lng)) {
+                lineString.pushPoint(coord.lat, coord.lng);
+                validPointsAdded++;
+              }
+            });
 
-        if (validPointsAdded < 2) {
+            console.log(`Sección ${index} (fallback): ${validPointsAdded} puntos agregados al LineString`);
+            
+            if (validPointsAdded < 2) {
+              console.error('Insuficientes puntos válidos en fallback para sección', index);
+              return;
+            }
+          }
+        } else {
           return;
         }
 
+        console.log(`Creando polyline para sección ${index}...`);
         const routeLine = new (H as any).map.Polyline(lineString, {
           style: {
             strokeColor: index === this.optimizedRoute.sections.length - 1 ? '#ff6b35' : '#1e90ff',
@@ -610,8 +688,10 @@ export class AddressManagementComponent implements OnInit, AfterViewInit {
           }
         });
 
+        console.log(`Agregando línea de ruta al mapa para sección ${index}`);
         this.routeLines.push(routeLine);
         this.map.addObject(routeLine);
+        console.log(`Línea agregada exitosamente. Total de líneas en el mapa:`, this.routeLines.length);
         
       } catch (error) {
         console.warn('Error al procesar sección de ruta:', error);
