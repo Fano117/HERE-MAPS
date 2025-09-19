@@ -10,7 +10,8 @@ import { RouterOutlet, RouterLink } from '@angular/router';
       <h1>HERE Maps - Gestión de Direcciones y Rastreo</h1>
       <nav style="margin-bottom: 20px;">
         <a routerLink="/address" class="btn btn-primary" style="margin-right: 10px;">Gestión de Direcciones</a>
-        <a routerLink="/tracking" class="btn btn-primary">Rastreo en Tiempo Real</a>
+        <a routerLink="/tracking" class="btn btn-primary" style="margin-right: 10px;">Rastreo en Tiempo Real</a>
+        <a routerLink="/coverage" class="btn btn-primary">Cobertura</a>
       </nav>
       <router-outlet />
     </div>

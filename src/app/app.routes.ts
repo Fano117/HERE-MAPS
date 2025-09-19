@@ -13,5 +13,9 @@ export const routes: Routes = [
   {
     path: 'tracking',
     loadComponent: () => import('./components/tracking-view/tracking-view.component').then(m => m.TrackingViewComponent)
+  },
+  {
+    path: 'coverage',
+    loadComponent: () => import('./components/coverage/coverage.component').then(m => m.CoverageComponent)
   }
 ];
