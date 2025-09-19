@@ -16,6 +16,7 @@ app.post('/api/location/:driverId', locationService.updateDriverLocation);
 
 app.get('/api/routes/:driverId', routeService.getDriverRoute);
 app.post('/api/routes/:driverId', routeService.updateDriverRoute);
+app.get('/api/addresses/problematic', routeService.getProblematicAddresses);
 
 app.get('/api/simulation/start/:driverId', locationService.startSimulation);
 app.get('/api/simulation/stop/:driverId', locationService.stopSimulation);

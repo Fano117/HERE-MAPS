@@ -309,4 +309,136 @@ export class HereMapsService {
   getCurrentLocation(): LocationUpdate | null {
     return this.currentLocationSubject.value;
   }
+
+  async calculateRoute(origin: {lat: number, lng: number}, destination: {lat: number, lng: number}): Promise<any> {
+    await this.ensureInitialized();
+    
+    const response = await fetch(
+      `https://router.hereapi.com/v8/routes?transportMode=car&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&return=polyline,summary&apikey=${this.API_KEY}`
+    );
+    
+    if (!response.ok) {
+      throw new Error('Error al calcular la ruta');
+    }
+    
+    const data = await response.json();
+    
+    if (data.routes && data.routes.length > 0) {
+      return data.routes[0];
+    }
+    
+    throw new Error('No se pudo calcular la ruta');
+  }
+
+  async calculateOptimizedRoute(startPoint: {lat: number, lng: number}, waypoints: {lat: number, lng: number}[]): Promise<any> {
+    await this.ensureInitialized();
+    
+    if (waypoints.length === 0) return null;
+    
+    // Validar coordenadas
+    if (!this.validateCoordinates(startPoint)) {
+      throw new Error('Coordenadas del punto de inicio inválidas');
+    }
+    
+    const validWaypoints = waypoints.filter(wp => this.validateCoordinates(wp));
+    if (validWaypoints.length === 0) {
+      throw new Error('No hay waypoints válidos');
+    }
+    
+    try {
+      // Calcular ruta simple visitando todos los puntos y regresando
+      const allRouteSegments = [];
+      let currentPoint = startPoint;
+      
+      // Ir a cada waypoint
+      for (const waypoint of validWaypoints) {
+        const routeSegment = await this.calculateRoute(currentPoint, waypoint);
+        allRouteSegments.push(routeSegment);
+        currentPoint = waypoint;
+      }
+      
+      // Regresar al punto de inicio
+      const returnSegment = await this.calculateRoute(currentPoint, startPoint);
+      allRouteSegments.push(returnSegment);
+      
+      // Combinar todos los segmentos
+      const combinedRoute = this.combineRouteSegments(allRouteSegments);
+      
+      console.log('Successfully calculated optimized route with', allRouteSegments.length, 'segments');
+      return combinedRoute;
+      
+    } catch (error) {
+      console.error('Error in calculateOptimizedRoute:', error);
+      throw error;
+    }
+  }
+
+  private combineRouteSegments(segments: any[]): any {
+    if (segments.length === 0) return null;
+    
+    const combinedSections = segments.map(segment => segment.sections[0]);
+    const totalSummary = segments.reduce((acc, segment) => {
+      const section = segment.sections[0];
+      acc.length += section.summary.length;
+      acc.duration += section.summary.duration;
+      return acc;
+    }, { length: 0, duration: 0 });
+    
+    return {
+      sections: combinedSections,
+      summary: totalSummary
+    };
+  }
+
+  private validateCoordinates(coord: {lat: number, lng: number}): boolean {
+    return coord.lat >= -90 && coord.lat <= 90 && 
+           coord.lng >= -180 && coord.lng <= 180 &&
+           !isNaN(coord.lat) && !isNaN(coord.lng);
+  }
+
+  decodePolyline(polyline: string): {lat: number, lng: number}[] {
+    if (!polyline || typeof polyline !== 'string' || polyline.length === 0) {
+      return [];
+    }
+    
+    const coordinates: {lat: number, lng: number}[] = [];
+    let index = 0;
+    let lat = 0;
+    let lng = 0;
+
+    while (index < polyline.length) {
+      let b: number;
+      let shift = 0;
+      let result = 0;
+      do {
+        b = polyline.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const deltaLat = ((result & 1) !== 0 ? ~(result >> 1) : (result >> 1));
+      lat += deltaLat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = polyline.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const deltaLng = ((result & 1) !== 0 ? ~(result >> 1) : (result >> 1));
+      lng += deltaLng;
+
+      const decodedLat = lat / 1e5;
+      const decodedLng = lng / 1e5;
+      
+      if (this.validateCoordinates({lat: decodedLat, lng: decodedLng})) {
+        coordinates.push({
+          lat: decodedLat,
+          lng: decodedLng
+        });
+      }
+    }
+
+    return coordinates;
+  }
 }

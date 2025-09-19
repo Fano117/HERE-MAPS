@@ -31,6 +31,12 @@ export class AddressService {
   }
 
   addAddress(address: Address): void {
+    // Validar que las coordenadas sean válidas antes de guardar
+    if (!this.isValidCoordinate(address.coordinates)) {
+      console.warn('Rejecting address with invalid coordinates:', address);
+      return;
+    }
+    
     const currentAddresses = this.addresses.value;
     const existingIndex = currentAddresses.findIndex(a => a.id === address.id);
     
@@ -41,6 +47,26 @@ export class AddressService {
     }
     
     this.saveAddresses(currentAddresses);
+  }
+
+  private isValidCoordinate(coord: {lat: number, lng: number}): boolean {
+    // Verificar que sean números válidos
+    if (isNaN(coord.lat) || isNaN(coord.lng)) return false;
+    
+    // Verificar rangos globales básicos
+    if (coord.lat < -90 || coord.lat > 90) return false;
+    if (coord.lng < -180 || coord.lng > 180) return false;
+    
+    // Verificar que estén dentro del área metropolitana de Ciudad de México
+    const bounds = {
+      minLat: 19.0,   
+      maxLat: 19.8,   
+      minLng: -99.5,  
+      maxLng: -98.8   
+    };
+    
+    return coord.lat >= bounds.minLat && coord.lat <= bounds.maxLat &&
+           coord.lng >= bounds.minLng && coord.lng <= bounds.maxLng;
   }
 
   removeAddress(addressId: string): void {

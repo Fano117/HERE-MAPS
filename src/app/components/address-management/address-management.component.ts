@@ -12,6 +12,14 @@ import { AddressService } from '../../services/address.service';
     <div class="card">
       <h2>Gestión de Direcciones</h2>
       
+      <div class="card" *ngIf="startingPoint" style="background-color: #e8f5e8; border-color: #4caf50;">
+        <h3>Punto de Partida</h3>
+        <p><strong>{{ startingPoint.label }}</strong></p>
+        <p style="font-size: 12px; color: #666;">
+          Coordenadas: {{ startingPoint.coordinates.lat }}, {{ startingPoint.coordinates.lng }}
+        </p>
+      </div>
+
       <div class="form-group">
         <label for="addressInput">Ingresa una dirección:</label>
         <input 
@@ -57,10 +65,15 @@ import { AddressService } from '../../services/address.service';
     </div>
 
     <div class="card" *ngIf="savedAddresses.length > 0">
-      <h3>Direcciones Guardadas</h3>
-      <div *ngFor="let address of savedAddresses" class="saved-address"
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3>Direcciones de Entrega</h3>
+        <button class="btn btn-primary" (click)="optimizeRoute()" [disabled]="!startingPoint">
+          Calcular Ruta Óptima
+        </button>
+      </div>
+      <div *ngFor="let address of savedAddresses; let i = index" class="saved-address"
            style="padding: 10px; border: 1px solid #ddd; margin: 5px 0; border-radius: 4px;">
-        <strong>{{ address.label }}</strong>
+        <strong>{{ i + 1 }}. {{ address.label }}</strong>
         <div style="font-size: 12px; color: #666;">
           Coordenadas: {{ address.coordinates.lat }}, {{ address.coordinates.lng }}
         </div>
@@ -71,6 +84,43 @@ import { AddressService } from '../../services/address.service';
                 style="margin-top: 5px; background-color: #dc3545;">
           Eliminar
         </button>
+      </div>
+    </div>
+
+    <div class="card" *ngIf="routeOptimized && routeSummary">
+      <h3>
+        Resumen de Ruta Optimizada 
+        <span *ngIf="routeSummary.isOptimized" style="background: #28a745; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-left: 10px;">
+          API Optimizada
+        </span>
+        <span *ngIf="!routeSummary.isOptimized" style="background: #ffc107; color: black; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-left: 10px;">
+          Cálculo Manual
+        </span>
+      </h3>
+      <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin-bottom: 15px;">
+        <h4>Resumen General</h4>
+        <p><strong>Distancia Total:</strong> {{ routeSummary.totalDistance }} km (incluye regreso)</p>
+        <p><strong>Tiempo Estimado Total:</strong> {{ routeSummary.totalTime }} minutos</p>
+        <p><strong>Número de Entregas:</strong> {{ routeSummary.pointDetails.length }}</p>
+        <div style="margin-top: 10px; padding: 8px; background-color: #e8f5e8; border-radius: 4px; border-left: 4px solid #28a745;">
+          <small><strong>Leyenda del mapa:</strong></small><br>
+          <small>🔵 Líneas azules: Ruta hacia entregas</small><br>
+          <small>🟠 Línea naranja punteada: Regreso al punto de partida</small>
+        </div>
+      </div>
+      
+      <h4>Detalle por Punto de Entrega</h4>
+      <div *ngFor="let detail of routeSummary.pointDetails; let i = index" 
+           style="padding: 10px; border: 1px solid #ddd; margin: 5px 0; border-radius: 4px; background-color: #fff;">
+        <strong>{{ i + 1 }}. {{ detail.address }}</strong>
+        <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+          <span style="color: #666; font-size: 12px;">
+            Distancia desde punto anterior: {{ detail.distanceFromPrevious }} km
+          </span>
+          <span style="color: #666; font-size: 12px;">
+            Tiempo estimado: {{ detail.timeFromPrevious }} min
+          </span>
+        </div>
       </div>
     </div>
   `
@@ -89,6 +139,20 @@ export class AddressManagementComponent implements OnInit, AfterViewInit {
   private ui: any;
   private behavior: any;
   private currentMarker: any;
+  
+  startingPoint: Address | null = null;
+  defaultAddresses: any[] = [
+    { address: 'CALLE YAUTEPEC 501', isCorrect: false },
+    { address: 'AV INSURGENTES 123 COLONIA ROMA', isCorrect: false },
+    { address: 'PROL CUITLAHUAC, San Martín Centro, San Martín de las Pirámides, Estado de México, 55850, México', isCorrect: true },
+    { address: 'Av. Paseo de la Reforma 222, Juárez, Ciudad de México, 06600, México', isCorrect: true },
+    { address: 'CALLE FALSA 999', isCorrect: false },
+    { address: 'Eje Central Lázaro Cárdenas 13, Centro Histórico, Ciudad de México, 06000, México', isCorrect: true }
+  ];
+  routeOptimized: boolean = false;
+  routeSummary: any = null;
+  optimizedRoute: any = null;
+  routeLines: any[] = [];
 
   constructor(
     private hereMapsService: HereMapsService,
@@ -96,6 +160,8 @@ export class AddressManagementComponent implements OnInit, AfterViewInit {
   ) {}
 
   ngOnInit(): void {
+    this.addressService.clearAllAddresses();
+    this.loadDefaultAddresses();
     this.addressService.addresses$.subscribe(addresses => {
       this.savedAddresses = addresses;
     });
@@ -105,6 +171,66 @@ export class AddressManagementComponent implements OnInit, AfterViewInit {
     setTimeout(() => {
       this.initializeMap();
     }, 500);
+  }
+
+  loadDefaultAddresses(): void {
+    const validAddresses = [
+      {
+        id: 'default-1',
+        label: 'Av. Paseo de la Reforma 222, Juárez, Ciudad de México, 06600, México',
+        coordinates: { lat: 19.4326, lng: -99.1332 }
+      },
+      {
+        id: 'default-2', 
+        label: 'Eje Central Lázaro Cárdenas 13, Centro Histórico, Ciudad de México, 06000, México',
+        coordinates: { lat: 19.4284, lng: -99.1276 }
+      },
+      {
+        id: 'default-3',
+        label: 'Polanco V Sección, Miguel Hidalgo, Ciudad de México, 11560, México', 
+        coordinates: { lat: 19.4363, lng: -99.1922 }
+      },
+      {
+        id: 'default-4',
+        label: 'Roma Norte, Ciudad de México, 06700, México',
+        coordinates: { lat: 19.4150, lng: -99.1620 }
+      },
+      {
+        id: 'default-5',
+        label: 'Condesa, Ciudad de México, 06140, México',
+        coordinates: { lat: 19.4080, lng: -99.1712 }
+      }
+    ];
+    
+    validAddresses.forEach(address => {
+      this.addressService.addAddress(address);
+    });
+    
+    setTimeout(() => {
+      this.demonstrateProblematicAddresses();
+    }, 2000);
+    
+    this.setDefaultStartingPoint();
+  }
+
+  demonstrateProblematicAddresses(): void {
+    const problematicAddresses = ['CALLE YAUTEPEC 501', 'AV INSURGENTES 123 COLONIA ROMA'];
+    
+    problematicAddresses.forEach((address, index) => {
+      setTimeout(() => {
+        this.addressInput = address;
+        this.validateAddress(true);
+      }, index * 3000);
+    });
+  }
+
+  async setDefaultStartingPoint(): Promise<void> {
+    const startingAddress = 'Ciudad Universitaria, Ciudad de México, 04510, México';
+    this.startingPoint = {
+      id: 'starting-point',
+      label: startingAddress,
+      coordinates: { lat: 19.3263, lng: -99.1757 }
+    };
   }
 
   private async initializeMap(): Promise<void> {
@@ -141,34 +267,37 @@ export class AddressManagementComponent implements OnInit, AfterViewInit {
     }
   }
 
-  async validateAddress(): Promise<void> {
+  async validateAddress(showMessages: boolean = true): Promise<void> {
     if (!this.addressInput.trim()) {
-      this.validationError = 'Por favor ingresa una dirección';
+      if (showMessages) this.validationError = 'Por favor ingresa una dirección';
       return;
     }
 
     try {
-      this.validationError = '';
-      this.validationSuccess = '';
+      if (showMessages) {
+        this.validationError = '';
+        this.validationSuccess = '';
+      }
       
       const validation = await this.hereMapsService.validateAddress(this.addressInput);
       
       if (validation.isValid) {
-        this.validationSuccess = 'Dirección válida encontrada';
+        if (showMessages) this.validationSuccess = 'Dirección válida encontrada';
         this.selectedAddress = validation.suggestions[0];
         this.suggestions = validation.suggestions;
         this.updateMapWithAddress(this.selectedAddress);
+        if (!showMessages) this.saveAddress();
       } else if (validation.suggestions.length > 0) {
-        this.validationError = 'Dirección no exacta. Por favor selecciona una de las sugerencias:';
+        if (showMessages) this.validationError = 'Dirección no exacta. Por favor selecciona una de las sugerencias:';
         this.suggestions = validation.suggestions;
         this.selectedAddress = null;
       } else {
-        this.validationError = 'No se encontraron direcciones similares. Intenta con una dirección diferente.';
+        if (showMessages) this.validationError = 'No se encontraron direcciones similares. Intenta con una dirección diferente.';
         this.suggestions = [];
         this.selectedAddress = null;
       }
     } catch (error) {
-      this.validationError = 'Error al validar la dirección. Intenta nuevamente.';
+      if (showMessages) this.validationError = 'Error al validar la dirección. Intenta nuevamente.';
       this.suggestions = [];
       this.selectedAddress = null;
     }
@@ -243,5 +372,313 @@ export class AddressManagementComponent implements OnInit, AfterViewInit {
 
   removeAddress(addressId: string): void {
     this.addressService.removeAddress(addressId);
+  }
+
+  async optimizeRoute(): Promise<void> {
+    if (!this.startingPoint || this.savedAddresses.length === 0) {
+      this.validationError = 'Necesitas un punto de partida y al menos una dirección de entrega';
+      return;
+    }
+
+    this.validationError = '';
+    this.validationSuccess = 'Calculando ruta optimizada...';
+    
+    try {
+      await this.calculateOptimizedRouteWithAPI();
+    } catch (error) {
+      console.warn('API Route calculation failed, using manual calculation:', error);
+      this.validationError = '';
+      this.validationSuccess = 'Usando cálculo manual (API no disponible)';
+      this.calculateOptimizedRoute();
+    }
+  }
+
+  private async calculateOptimizedRouteWithAPI(): Promise<void> {
+    if (!this.startingPoint) return;
+
+    this.validationSuccess = 'Calculando la mejor ruta...';
+    
+    // Filtrar solo coordenadas válidas dentro del área metropolitana de Ciudad de México
+    const validWaypoints = this.savedAddresses
+      .filter(addr => this.isValidCDMXCoordinate(addr.coordinates))
+      .map(addr => addr.coordinates);
+    
+    if (validWaypoints.length === 0) {
+      throw new Error('No hay direcciones válidas para calcular la ruta');
+    }
+    
+    console.log('Valid waypoints:', validWaypoints);
+    
+    try {
+      this.optimizedRoute = await this.hereMapsService.calculateOptimizedRoute(
+        this.startingPoint.coordinates,
+        validWaypoints
+      );
+      
+      const summary = this.optimizedRoute.summary || 
+        this.optimizedRoute.sections.reduce((acc: any, section: any) => {
+          acc.length += section.summary.length;
+          acc.duration += section.summary.duration;
+          return acc;
+        }, { length: 0, duration: 0 });
+
+      this.routeSummary = {
+        totalDistance: Math.round((summary.length || summary.distance) / 1000 * 100) / 100,
+        totalTime: Math.round((summary.duration || summary.time) / 60),
+        pointDetails: this.generateRouteDetails(),
+        isOptimized: true
+      };
+
+      this.routeOptimized = true;
+      this.validationSuccess = 'Ruta optimizada calculada exitosamente';
+      
+      await this.showOptimizedRouteOnMap();
+      
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  private generateRouteDetails(): any[] {
+    if (!this.optimizedRoute || !this.optimizedRoute.sections) return [];
+    
+    const validAddresses = this.savedAddresses.filter(addr => this.isValidCDMXCoordinate(addr.coordinates));
+    
+    return validAddresses.map((address, index) => {
+      const section = this.optimizedRoute.sections[index];
+      return {
+        address: address.label,
+        distanceFromPrevious: section ? Math.round(section.summary.length / 1000 * 100) / 100 : 0,
+        timeFromPrevious: section ? Math.round(section.summary.duration / 60) : 0,
+        coordinates: address.coordinates
+      };
+    });
+  }
+
+  private calculateOptimizedRoute(): void {
+    if (!this.startingPoint) return;
+    
+    // Filtrar solo direcciones válidas para cálculo manual también
+    const validSavedAddresses = this.savedAddresses.filter(addr => this.isValidCDMXCoordinate(addr.coordinates));
+    
+    if (validSavedAddresses.length === 0) {
+      this.validationError = 'No hay direcciones válidas para calcular la ruta';
+      return;
+    }
+    
+    const allPoints = [this.startingPoint, ...validSavedAddresses];
+    const distances: number[] = [];
+    let totalDistance = 0;
+    let totalTime = 0;
+
+    for (let i = 0; i < allPoints.length - 1; i++) {
+      const currentPoint = allPoints[i];
+      const nextPoint = allPoints[i + 1];
+      if (currentPoint && nextPoint) {
+        const distance = this.calculateDistance(currentPoint.coordinates, nextPoint.coordinates);
+        distances.push(distance);
+        totalDistance += distance;
+        totalTime += Math.ceil(distance / 1000 * 2.5 + 10);
+      }
+    }
+    
+    const returnDistance = this.calculateDistance(
+      validSavedAddresses[validSavedAddresses.length - 1]?.coordinates || this.startingPoint.coordinates,
+      this.startingPoint.coordinates
+    );
+    totalDistance += returnDistance;
+    totalTime += Math.ceil(returnDistance / 1000 * 2.5 + 10);
+
+    this.routeSummary = {
+      totalDistance: Math.round(totalDistance / 1000 * 100) / 100,
+      totalTime: totalTime,
+      isOptimized: false,
+      pointDetails: validSavedAddresses.map((address, index) => ({
+        address: address.label,
+        distanceFromPrevious: distances[index] ? Math.round(distances[index] / 1000 * 100) / 100 : 0,
+        timeFromPrevious: distances[index] ? Math.ceil(distances[index] / 1000 * 2.5 + 10) : 0,
+        coordinates: address.coordinates
+      }))
+    };
+
+    this.optimizedRoute = null;
+    
+    this.routeOptimized = true;
+    this.validationSuccess = 'Ruta calculada exitosamente (método manual)';
+    this.showOptimizedRouteOnMap();
+  }
+
+  private calculateDistance(coord1: any, coord2: any): number {
+    const R = 6371000;
+    const φ1 = coord1.lat * Math.PI / 180;
+    const φ2 = coord2.lat * Math.PI / 180;
+    const Δφ = (coord2.lat - coord1.lat) * Math.PI / 180;
+    const Δλ = (coord2.lng - coord1.lng) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  }
+
+  private async showOptimizedRouteOnMap(): Promise<void> {
+    if (!this.map) return;
+
+    this.clearMapMarkers();
+    this.clearRouteLines();
+    
+    if (this.startingPoint) {
+      const startMarker = new (H as any).map.Marker(this.startingPoint.coordinates, {
+        icon: new (H as any).map.Icon(
+          `<svg width="24" height="32" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" fill="green" stroke="white" stroke-width="2"/>
+            <text x="12" y="16" font-family="Arial" font-size="12" text-anchor="middle" fill="white">S</text>
+          </svg>`,
+          { size: { w: 24, h: 32 } }
+        )
+      });
+      this.map.addObject(startMarker);
+    }
+
+    // Solo mostrar direcciones válidas
+    const validAddressesForMarkers = this.savedAddresses.filter(addr => this.isValidCDMXCoordinate(addr.coordinates));
+    
+    validAddressesForMarkers.forEach((address, index) => {
+      const marker = new (H as any).map.Marker(address.coordinates, {
+        icon: new (H as any).map.Icon(
+          `<svg width="24" height="32" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" fill="red" stroke="white" stroke-width="2"/>
+            <text x="12" y="16" font-family="Arial" font-size="12" text-anchor="middle" fill="white">${index + 1}</text>
+          </svg>`,
+          { size: { w: 24, h: 32 } }
+        )
+      });
+      this.map.addObject(marker);
+    });
+
+    if (this.optimizedRoute && this.optimizedRoute.sections) {
+      this.drawRouteLines();
+    }
+
+    const validAddressesForBounds = this.savedAddresses.filter(addr => this.isValidCDMXCoordinate(addr.coordinates));
+    const allCoords = [this.startingPoint?.coordinates, ...validAddressesForBounds.map(a => a.coordinates)].filter(Boolean);
+    if (allCoords.length > 0) {
+      this.adjustMapViewToShowAllPoints(allCoords);
+    }
+  }
+
+  private drawRouteLines(): void {
+    if (!this.map || !this.optimizedRoute?.sections || !Array.isArray(this.optimizedRoute.sections)) {
+      return;
+    }
+
+    this.optimizedRoute.sections.forEach((section: any, index: number) => {
+      if (!section || !section.polyline || typeof section.polyline !== 'string') {
+        return;
+      }
+      
+      try {
+        const routeCoordinates = this.hereMapsService.decodePolyline(section.polyline);
+        
+        if (!Array.isArray(routeCoordinates) || routeCoordinates.length === 0) {
+          return;
+        }
+        
+        const lineString = new (H as any).geo.LineString();
+        let validPointsAdded = 0;
+        
+        routeCoordinates.forEach((coord: any) => {
+          if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && 
+              !isNaN(coord.lat) && !isNaN(coord.lng)) {
+            lineString.pushPoint(coord.lat, coord.lng);
+            validPointsAdded++;
+          }
+        });
+
+        if (validPointsAdded < 2) {
+          return;
+        }
+
+        const routeLine = new (H as any).map.Polyline(lineString, {
+          style: {
+            strokeColor: index === this.optimizedRoute.sections.length - 1 ? '#ff6b35' : '#1e90ff',
+            lineWidth: 4,
+            lineDash: index === this.optimizedRoute.sections.length - 1 ? [5, 5] : [0],
+            lineCap: 'round'
+          }
+        });
+
+        this.routeLines.push(routeLine);
+        this.map.addObject(routeLine);
+        
+      } catch (error) {
+        console.warn('Error al procesar sección de ruta:', error);
+      }
+    });
+  }
+
+  private clearRouteLines(): void {
+    if (!this.map) return;
+    
+    this.routeLines.forEach(line => {
+      try {
+        this.map.removeObject(line);
+      } catch (error) {
+        // Ignorar errores
+      }
+    });
+    this.routeLines = [];
+  }
+
+  private adjustMapViewToShowAllPoints(coords: any[]): void {
+    if (coords.length === 0 || !this.map) return;
+    
+    if (coords.length === 1) {
+      this.map.setCenter(coords[0]);
+      this.map.setZoom(15);
+      return;
+    }
+
+    const lats = coords.map(c => c.lat);
+    const lngs = coords.map(c => c.lng);
+    
+    const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+    
+    this.map.setCenter({ lat: centerLat, lng: centerLng });
+    
+    const latRange = Math.max(...lats) - Math.min(...lats);
+    const lngRange = Math.max(...lngs) - Math.min(...lngs);
+    const maxRange = Math.max(latRange, lngRange);
+    
+    let zoom = 15;
+    if (maxRange > 0.1) zoom = 10;
+    else if (maxRange > 0.05) zoom = 12;
+    else if (maxRange > 0.01) zoom = 14;
+    
+    this.map.setZoom(zoom);
+  }
+
+  private clearMapMarkers(): void {
+    if (!this.map) return;
+    
+    this.map.removeObjects(this.map.getObjects());
+    this.clearRouteLines();
+  }
+
+  private isValidCDMXCoordinate(coord: {lat: number, lng: number}): boolean {
+    // Área metropolitana de Ciudad de México aproximada
+    const bounds = {
+      minLat: 19.0,   // Sur de CDMX
+      maxLat: 19.8,   // Norte de CDMX
+      minLng: -99.5,  // Oeste de CDMX
+      maxLng: -98.8   // Este de CDMX
+    };
+    
+    return coord.lat >= bounds.minLat && coord.lat <= bounds.maxLat &&
+           coord.lng >= bounds.minLng && coord.lng <= bounds.maxLng &&
+           !isNaN(coord.lat) && !isNaN(coord.lng);
   }
 }

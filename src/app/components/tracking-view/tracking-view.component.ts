@@ -33,12 +33,18 @@ import { Subscription, interval } from 'rxjs';
       <div #trackingMap class="map-container" style="height: 500px;"></div>
 
       <div class="card" *ngIf="currentLocation" style="margin-top: 20px;">
-        <h3>Ubicación Actual</h3>
+        <h3>Ubicación del Conductor</h3>
         <p><strong>Conductor:</strong> {{ getSelectedDriverName() }}</p>
         <p><strong>Coordenadas:</strong> {{ currentLocation.coordinates.lat }}, {{ currentLocation.coordinates.lng }}</p>
         <p><strong>Velocidad:</strong> {{ currentLocation.speed || 0 }} km/h</p>
         <p><strong>Última actualización:</strong> {{ currentLocation.timestamp | date:'medium' }}</p>
         <p *ngIf="currentAddress"><strong>Dirección actual:</strong> {{ currentAddress.label }}</p>
+        <div *ngIf="currentRoute" style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+          <h4>Ruta Actual</h4>
+          <p><strong>Distancia total:</strong> {{ currentRoute.totalDistance }} km</p>
+          <p><strong>Tiempo estimado:</strong> {{ currentRoute.estimatedTime }} minutos</p>
+          <p><strong>Entregas completadas:</strong> {{ currentRoute.completedDeliveries }} / {{ currentRoute.totalDeliveries }}</p>
+        </div>
       </div>
 
       <div class="card" *ngIf="savedAddresses.length > 0">
@@ -98,6 +104,7 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
   currentAddress: Address | null = null;
   savedAddresses: Address[] = [];
   completedAddresses: Set<string> = new Set();
+  currentRoute: any = null;
 
   private map: any;
   private ui: any;
@@ -208,8 +215,10 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
     this.http.get<LocationUpdate>(`http://localhost:3000/api/location/${this.selectedDriverId}`)
       .subscribe({
         next: (location) => {
+          this.currentLocation = location;
           this.hereMapsService.updateLocation(location);
           this.updateCurrentAddress(location.coordinates);
+          this.updateCurrentRoute();
         },
         error: (error) => {
           this.trackingError = 'Error al obtener la ubicación del conductor';
@@ -224,6 +233,69 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
     } catch (error) {
       this.currentAddress = null;
     }
+  }
+
+  private updateCurrentRoute(): void {
+    if (!this.savedAddresses.length || !this.currentLocation) return;
+
+    const totalDeliveries = this.savedAddresses.length;
+    const completedDeliveries = this.getCompletedDeliveryCount();
+    const totalDistance = this.calculateTotalRouteDistance();
+    const estimatedTime = this.calculateEstimatedTime();
+
+    this.currentRoute = {
+      totalDistance: totalDistance,
+      estimatedTime: estimatedTime,
+      completedDeliveries: completedDeliveries,
+      totalDeliveries: totalDeliveries,
+      progress: Math.round((completedDeliveries / totalDeliveries) * 100)
+    };
+  }
+
+  private getCompletedDeliveryCount(): number {
+    return this.savedAddresses.filter(addr => this.isAddressCompleted(addr)).length;
+  }
+
+  private calculateTotalRouteDistance(): number {
+    if (!this.savedAddresses.length || !this.currentLocation) return 0;
+    
+    let totalDistance = 0;
+    let currentPoint = this.currentLocation.coordinates;
+
+    for (const address of this.savedAddresses) {
+      if (!this.isAddressCompleted(address)) {
+        const distance = this.calculateDistance(currentPoint, address.coordinates);
+        totalDistance += distance;
+        currentPoint = address.coordinates;
+      }
+    }
+
+    return Math.round(totalDistance / 1000 * 100) / 100;
+  }
+
+  private calculateEstimatedTime(): number {
+    if (!this.savedAddresses.length) return 0;
+    
+    const remainingDeliveries = this.savedAddresses.filter(addr => !this.isAddressCompleted(addr)).length;
+    const avgTimePerDelivery = 15;
+    const travelTime = this.calculateTotalRouteDistance() / 50 * 60;
+    
+    return Math.round(remainingDeliveries * avgTimePerDelivery + travelTime);
+  }
+
+  private calculateDistance(coord1: any, coord2: any): number {
+    const R = 6371000;
+    const φ1 = coord1.lat * Math.PI / 180;
+    const φ2 = coord2.lat * Math.PI / 180;
+    const Δφ = (coord2.lat - coord1.lat) * Math.PI / 180;
+    const Δλ = (coord2.lng - coord1.lng) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
   }
 
   private updateCurrentLocationOnMap(): void {
@@ -316,20 +388,6 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
     return Math.round(this.calculateDistance(this.currentLocation.coordinates, address.coordinates));
   }
 
-  private calculateDistance(coord1: { lat: number; lng: number }, coord2: { lat: number; lng: number }): number {
-    const R = 6371e3;
-    const φ1 = coord1.lat * Math.PI / 180;
-    const φ2 = coord2.lat * Math.PI / 180;
-    const Δφ = (coord2.lat - coord1.lat) * Math.PI / 180;
-    const Δλ = (coord2.lng - coord1.lng) * Math.PI / 180;
-
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c;
-  }
 
   private startSimulation(): void {
     this.http.get(`http://localhost:3000/api/simulation/start/${this.selectedDriverId}`)
