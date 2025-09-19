@@ -78,6 +78,12 @@ import { Subscription, interval } from 'rxjs';
         <button class="btn btn-primary" (click)="stopTracking()" [disabled]="!trackingActive" style="margin-left: 10px;">
           Detener Rastreo
         </button>
+        <button class="btn btn-success" (click)="calculateAndShowRoute()" [disabled]="!currentLocation || savedAddresses.length === 0" style="margin-left: 10px; background-color: #28a745; border-color: #28a745;">
+          Mostrar Ruta Optimizada ({{ savedAddresses.length }} direcciones)
+        </button>
+        <button class="btn btn-warning" (click)="clearRouteLines()" [disabled]="routeLines.length === 0" style="margin-left: 10px; background-color: #ffc107; border-color: #ffc107; color: black;">
+          Ocultar Ruta ({{ routeLines.length }} líneas)
+        </button>
       </div>
     </div>
   `,
@@ -111,6 +117,10 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
   private behavior: any;
   private currentMarker: any;
   private routeMarkers: any[] = [];
+  private startingPointMarker: any = null;
+  routeLines: any[] = [];
+  private optimizedRoute: any = null;
+  private routeStartPoint: any = null;
   private trackingSubscription: Subscription | null = null;
   private locationSubscription: Subscription | null = null;
 
@@ -121,8 +131,10 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
   ) {}
 
   ngOnInit(): void {
+    console.log('TrackingViewComponent cargado con funcionalidad de rutas');
     this.addressService.addresses$.subscribe(addresses => {
       this.savedAddresses = addresses;
+      console.log('Direcciones cargadas en tracking:', addresses.length);
       this.updateRouteMarkers();
     });
 
@@ -182,6 +194,7 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
     this.currentLocation = null;
     this.currentAddress = null;
     this.trackingError = '';
+    this.clearRouteLines();
   }
 
   startTracking(): void {
@@ -209,6 +222,131 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
       this.trackingSubscription.unsubscribe();
       this.trackingSubscription = null;
     }
+    this.clearRouteLines();
+  }
+
+  async calculateAndShowRoute(): Promise<void> {
+    if (!this.map || !this.currentLocation || this.savedAddresses.length === 0) {
+      this.trackingError = 'No se puede calcular la ruta. Asegúrate de que haya puntos de entrega y ubicación actual.';
+      return;
+    }
+
+    this.trackingError = '';
+    
+    try {
+      // Filtrar direcciones no completadas
+      const pendingAddresses = this.savedAddresses.filter(addr => !this.isAddressCompleted(addr));
+      
+      if (pendingAddresses.length === 0) {
+        this.trackingError = 'No hay entregas pendientes para mostrar ruta.';
+        return;
+      }
+
+      // Usar la ubicación actual como punto de inicio para la ruta
+      this.routeStartPoint = this.currentLocation.coordinates;
+      const waypoints = pendingAddresses.map(addr => addr.coordinates);
+
+      this.optimizedRoute = await this.hereMapsService.calculateOptimizedRoute(this.routeStartPoint, waypoints);
+      
+      if (this.optimizedRoute) {
+        this.clearRouteLines();
+        this.drawRouteLines();
+        this.updateRouteMarkers(); // Actualizar marcadores después de mostrar la ruta
+        this.trackingError = '';
+      } else {
+        this.trackingError = 'No se pudo calcular la ruta optimizada.';
+      }
+    } catch (error) {
+      console.error('Error calculando ruta en tracking:', error);
+      this.trackingError = 'Error al calcular la ruta optimizada.';
+    }
+  }
+
+  private drawRouteLines(): void {
+    if (!this.map || !this.optimizedRoute?.sections || !Array.isArray(this.optimizedRoute.sections)) {
+      return;
+    }
+
+    this.optimizedRoute.sections.forEach((section: any, index: number) => {
+      if (!section) return;
+      
+      try {
+        let lineString = new (H as any).geo.LineString();
+        
+        if (section.type === 'manual' && section.departure && section.arrival) {
+          const departure = section.departure;
+          const arrival = section.arrival;
+          
+          if (this.hereMapsService.validateCoordinates(departure) && 
+              this.hereMapsService.validateCoordinates(arrival)) {
+            lineString.pushPoint(departure.lat, departure.lng);
+            lineString.pushPoint(arrival.lat, arrival.lng);
+          } else {
+            return;
+          }
+        } else if (section.polyline && typeof section.polyline === 'string') {
+          try {
+            lineString = (H as any).geo.LineString.fromFlexiblePolyline(section.polyline);
+          } catch (decodeError) {
+            const routeCoordinates = this.hereMapsService.decodePolyline(section.polyline);
+            
+            if (!Array.isArray(routeCoordinates) || routeCoordinates.length === 0) {
+              return;
+            }
+            
+            let validPointsAdded = 0;
+            routeCoordinates.forEach((coord: any) => {
+              if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number' && 
+                  !isNaN(coord.lat) && !isNaN(coord.lng)) {
+                lineString.pushPoint(coord.lat, coord.lng);
+                validPointsAdded++;
+              }
+            });
+
+            if (validPointsAdded < 2) {
+              return;
+            }
+          }
+        } else {
+          return;
+        }
+
+        const routeLine = new (H as any).map.Polyline(lineString, {
+          style: {
+            strokeColor: index === this.optimizedRoute.sections.length - 1 ? '#ff6b35' : '#1e90ff',
+            lineWidth: 4,
+            lineDash: [0],
+            lineCap: 'round'
+          }
+        });
+
+        this.routeLines.push(routeLine);
+        this.map.addObject(routeLine);
+        
+      } catch (error) {
+        console.warn('Error al procesar sección de ruta en tracking:', error);
+      }
+    });
+  }
+
+  clearRouteLines(): void {
+    if (!this.map) return;
+    
+    this.routeLines.forEach(line => {
+      try {
+        this.map.removeObject(line);
+      } catch (error) {
+        console.warn('Error removiendo línea de ruta:', error);
+      }
+    });
+    this.routeLines = [];
+    
+    // También limpiar punto de inicio cuando se oculta la ruta
+    if (this.startingPointMarker) {
+      this.map.removeObject(this.startingPointMarker);
+      this.startingPointMarker = null;
+    }
+    this.routeStartPoint = null;
   }
 
   private fetchLocationUpdate(): void {
@@ -301,55 +439,113 @@ export class TrackingViewComponent implements OnInit, OnDestroy, AfterViewInit {
   private updateCurrentLocationOnMap(): void {
     if (!this.currentLocation || !this.map) return;
 
+    // Limpiar marcador de ubicación actual anterior
     if (this.currentMarker) {
-      this.hereMapsService.removeMarkerSafely(this.map, this.currentMarker);
+      this.map.removeObject(this.currentMarker);
     }
 
-    const icon = new H.map.Icon(
-      'data:image/svg+xml;base64,' + btoa(`
-        <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="16" cy="16" r="12" fill="blue" stroke="white" stroke-width="3"/>
-          <circle cx="16" cy="16" r="6" fill="white"/>
-        </svg>
-      `),
+    // Crear marcador de ubicación actual del conductor (diferente al punto de inicio)
+    const driverIcon = new (H as any).map.Icon(
+      `<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="12" fill="blue" stroke="white" stroke-width="3"/>
+        <circle cx="16" cy="16" r="6" fill="white"/>
+        <circle cx="16" cy="16" r="3" fill="blue"/>
+      </svg>`,
       { size: { w: 32, h: 32 } }
     );
 
-    this.currentMarker = this.hereMapsService.addMarker(
-      this.map,
-      this.currentLocation.coordinates,
-      { icon }
-    );
-
+    this.currentMarker = new (H as any).map.Marker(this.currentLocation.coordinates, { icon: driverIcon });
+    this.map.addObject(this.currentMarker);
+    
+    // Actualizar marcadores de ruta si es necesario
+    this.updateRouteMarkers();
+    
+    // Centrar el mapa en la ubicación actual
     this.map.setCenter(this.currentLocation.coordinates);
+    
+    console.log('Ubicación del conductor actualizada:', this.currentLocation.coordinates);
   }
 
   private updateRouteMarkers(): void {
     if (!this.map) return;
     
+    // Limpiar marcadores existentes
     this.routeMarkers.forEach(marker => {
-      this.hereMapsService.removeMarkerSafely(this.map, marker);
+      try {
+        this.map.removeObject(marker);
+      } catch (error) {
+        console.warn('Error removiendo marcador:', error);
+      }
     });
     this.routeMarkers = [];
+    console.log('Marcadores limpiados, actualizando...');
 
-    this.savedAddresses.forEach((address, index) => {
-      const icon = new H.map.Icon(
+    // Agregar marcador de inicio (ubicación del conductor)
+    if (this.currentLocation) {
+      const startIcon = new (H as any).map.Icon(
         'data:image/svg+xml;base64=' + btoa(`
-          <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="16" cy="16" r="12" fill="${this.isAddressCompleted(address) ? 'green' : 'red'}" stroke="white" stroke-width="3"/>
-            <text x="16" y="20" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${index + 1}</text>
+          <svg width="36" height="36" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="18" cy="18" r="15" fill="blue" stroke="white" stroke-width="4"/>
+            <text x="18" y="23" text-anchor="middle" fill="white" font-size="16" font-weight="bold">S</text>
           </svg>
         `),
-        { size: { w: 32, h: 32 } }
+        { size: { w: 36, h: 36 } }
       );
 
-      const marker = this.hereMapsService.addMarker(
-        this.map,
-        address.coordinates,
-        { icon }
+      const startMarker = new (H as any).map.Marker(this.currentLocation.coordinates, { icon: startIcon });
+      this.map.addObject(startMarker);
+      this.routeMarkers.push(startMarker);
+      console.log('Marcador de inicio agregado en:', this.currentLocation.coordinates);
+    }
+
+    // Agregar marcadores para cada dirección
+    this.savedAddresses.forEach((address, index) => {
+      const isCompleted = this.isAddressCompleted(address);
+      const isPending = !isCompleted;
+      
+      const color = isCompleted ? '#28a745' : '#dc3545';
+      const symbol = isCompleted ? 
+        '<path d="M12 18 l3 3 l6-6" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' :
+        `<text x="18" y="24" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${index + 1}</text>`;
+      
+      const icon = new (H as any).map.Icon(
+        'data:image/svg+xml,' + encodeURIComponent(`
+          <svg width="36" height="36" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="18" cy="18" r="15" fill="${color}" stroke="white" stroke-width="4"/>
+            ${symbol}
+          </svg>
+        `),
+        { size: { w: 36, h: 36 } }
       );
+
+      const marker = new (H as any).map.Marker(address.coordinates, { icon });
+      this.map.addObject(marker);
+      
+      // Agregar evento de clic para mostrar información
+      marker.addEventListener('tap', (evt: any) => {
+        const bubble = new (H as any).ui.InfoBubble(
+          `<div style="padding: 5px;">
+            <strong>${isCompleted ? 'COMPLETADO' : 'PENDIENTE'}</strong><br>
+            <strong>${index + 1}. ${address.label}</strong><br>
+            <small>Lat: ${address.coordinates.lat.toFixed(4)}, Lng: ${address.coordinates.lng.toFixed(4)}</small>
+            ${this.getDistanceToAddress(address) !== null ? 
+              `<br><small>Distancia: ${this.getDistanceToAddress(address)}m</small>` : ''
+            }
+          </div>`,
+          { lat: address.coordinates.lat, lng: address.coordinates.lng }
+        );
+        this.ui.addBubble(bubble);
+      });
+      
       this.routeMarkers.push(marker);
+      console.log(`Marcador ${index + 1} agregado:`, {
+        completed: isCompleted,
+        coordinates: address.coordinates,
+        label: address.label
+      });
     });
+    
+    console.log(`Total marcadores agregados: ${this.routeMarkers.length}`);
   }
 
   private checkProximityToDeliveryPoints(): void {
