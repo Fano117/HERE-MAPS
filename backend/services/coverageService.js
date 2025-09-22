@@ -119,5 +119,6 @@ module.exports = {
   getAllCoveragePolygons,
   createCoveragePolygon,
   updateCoveragePolygon,
-  deleteCoveragePolygon
+  deleteCoveragePolygon,
+  loadCoverageData
 };

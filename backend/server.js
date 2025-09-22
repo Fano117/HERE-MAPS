@@ -25,6 +25,7 @@ app.use((req, res, next) => {
 const locationService = require('./services/locationService');
 const routeService = require('./services/routeService');
 const coverageService = require('./services/coverageService');
+const polygonAnalysisService = require('./services/polygonAnalysisService');
 
 app.get('/api/location/:driverId', locationService.getDriverLocation);
 app.post('/api/location/:driverId', locationService.updateDriverLocation);
@@ -40,6 +41,9 @@ app.get('/api/coverage', coverageService.getAllCoveragePolygons);
 app.post('/api/coverage', coverageService.createCoveragePolygon);
 app.post('/api/coverage/:id', coverageService.updateCoveragePolygon);
 app.post('/api/coverage/delete/:id', coverageService.deleteCoveragePolygon);
+
+app.post('/api/polygon-analysis/address', polygonAnalysisService.analyzeAddressPoint);
+app.post('/api/polygon-analysis/point', polygonAnalysisService.analyzeMapPoint);
 
 app.listen(port, () => {
   console.log(`Servidor ejecutándose en puerto ${port}`);
