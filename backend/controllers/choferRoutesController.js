@@ -1,5 +1,5 @@
 const axios = require('axios');
-const HERE_API_KEY = 'GYo3JTyTU2DjUu_dGyaDc2LIZyANv1zL5-Lot729yhw';
+const HERE_API_KEY = process.env.HERE_API_KEY || 'GYo3JTyTU2DjUu_dGyaDc2LIZyANv1zL5-Lot729yhw';
 
 // Almacenamiento en memoria de rutas de choferes
 const choferRoutes = new Map();

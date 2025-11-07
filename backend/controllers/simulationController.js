@@ -1,5 +1,7 @@
 // Controlador de simulación para testing
 
+const { calculateDistance, calculateHeading } = require('../utils/geoUtils');
+
 const simulationIntervals = new Map();
 const simulationRoutes = new Map();
 
@@ -207,30 +209,6 @@ function updateSimulationPosition(choferId, distancia) {
       }
     }
   }
-}
-
-// Calcular distancia entre dos puntos (fórmula de Haversine)
-function calculateDistance(point1, point2) {
-  const R = 6371e3; // Radio de la Tierra en metros
-  const φ1 = point1.lat * Math.PI / 180;
-  const φ2 = point2.lat * Math.PI / 180;
-  const Δφ = (point2.lat - point1.lat) * Math.PI / 180;
-  const Δλ = (point2.lng - point1.lng) * Math.PI / 180;
-
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c; // Distancia en metros
-}
-
-// Calcular heading/dirección
-function calculateHeading(start, end) {
-  const dLng = end.lng - start.lng;
-  const dLat = end.lat - start.lat;
-  const heading = Math.atan2(dLng, dLat) * (180 / Math.PI);
-  return (heading + 360) % 360;
 }
 
 module.exports = {

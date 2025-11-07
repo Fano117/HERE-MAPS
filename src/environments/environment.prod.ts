@@ -1,10 +1,13 @@
+// Production environment configuration
+// IMPORTANT: Replace these values with actual production settings
+// Consider using Angular's file replacement feature or environment variable injection
 export const environment = {
   production: true,
-  hereMapsApiKey: 'GYo3JTyTU2DjUu_dGyaDc2LIZyANv1zL5-Lot729yhw',
-  hereMapsAppId: '7LVwgFjjHhNtTtROLWKD',
-  backendUrl: 'http://localhost:3000',
-  fultraTrackApi: 'https://localhost:7075/api',
-  wsUrl: 'ws://localhost:3000',
+  hereMapsApiKey: '', // SET THIS IN PRODUCTION BUILD
+  hereMapsAppId: '', // SET THIS IN PRODUCTION BUILD
+  backendUrl: '', // SET THIS IN PRODUCTION BUILD (e.g., 'https://api.yourcompany.com')
+  fultraTrackApi: '', // SET THIS IN PRODUCTION BUILD
+  wsUrl: '', // SET THIS IN PRODUCTION BUILD (e.g., 'wss://api.yourcompany.com')
   geofenceRadius: 200,
   trackingInterval: 30000,
   simulationSpeed: 60

@@ -1,7 +1,9 @@
+// Development environment configuration
+// In production, these values should be replaced during build time
 export const environment = {
   production: false,
-  hereMapsApiKey: 'GYo3JTyTU2DjUu_dGyaDc2LIZyANv1zL5-Lot729yhw',
-  hereMapsAppId: '7LVwgFjjHhNtTtROLWKD',
+  hereMapsApiKey: 'GYo3JTyTU2DjUu_dGyaDc2LIZyANv1zL5-Lot729yhw', // Replace in production
+  hereMapsAppId: '7LVwgFjjHhNtTtROLWKD', // Replace in production
   backendUrl: 'http://localhost:3000',
   fultraTrackApi: 'https://localhost:7075/api',
   wsUrl: 'ws://localhost:3000',
