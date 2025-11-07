@@ -7,10 +7,11 @@ import { RouterOutlet, RouterLink } from '@angular/router';
   imports: [RouterOutlet, RouterLink],
   template: `
     <div class="container">
-      <h1>HERE Maps - Gestión de Direcciones y Rastreo</h1>
+      <h1>HERE Maps - Sistema de Entregas</h1>
       <nav style="margin-bottom: 20px;">
-        <a routerLink="/address" class="btn btn-primary" style="margin-right: 10px;">Gestión de Direcciones</a>
+        <a routerLink="/reportes/entregas" class="btn btn-primary" style="margin-right: 10px;">Reportes de Entregas</a>
         <a routerLink="/tracking" class="btn btn-primary" style="margin-right: 10px;">Rastreo en Tiempo Real</a>
+        <a routerLink="/address" class="btn btn-primary" style="margin-right: 10px;">Gestión de Direcciones</a>
         <a routerLink="/coverage" class="btn btn-primary">Cobertura</a>
       </nav>
       <router-outlet />

@@ -506,4 +506,99 @@ export class HereMapsService {
 
     return coordinates;
   }
+
+  // Crear geocerca (círculo) en el mapa
+  createGeofence(map: any, lat: number, lng: number, radius: number = 200): any {
+    if (typeof H === 'undefined' || !H.map || !H.map.Circle) {
+      throw new Error('HERE Maps Circle no disponible');
+    }
+
+    const circle = new H.map.Circle(
+      { lat, lng },
+      radius,
+      {
+        style: {
+          strokeColor: 'rgba(55, 85, 170, 0.6)',
+          lineWidth: 2,
+          fillColor: 'rgba(55, 85, 170, 0.2)'
+        }
+      }
+    );
+
+    map.addObject(circle);
+    return circle;
+  }
+
+  // Agregar capa de tráfico
+  addTrafficLayer(map: any): void {
+    try {
+      if (!this.platform) {
+        throw new Error('Platform no inicializada');
+      }
+
+      const trafficLayer = this.platform.createDefaultLayers().vector.normal.traffic;
+      if (trafficLayer) {
+        map.addLayer(trafficLayer);
+      }
+    } catch (error) {
+      console.error('Error adding traffic layer:', error);
+    }
+  }
+
+  // Ajustar vista del mapa a coordenadas
+  fitBounds(map: any, coordinates: { lat: number; lng: number }[]): void {
+    if (!coordinates || coordinates.length === 0) return;
+
+    if (coordinates.length === 1) {
+      map.setCenter(coordinates[0]);
+      map.setZoom(15);
+      return;
+    }
+
+    const bounds = new H.geo.Rect(
+      coordinates[0].lat,
+      coordinates[0].lng,
+      coordinates[0].lat,
+      coordinates[0].lng
+    );
+
+    coordinates.forEach(coord => {
+      bounds.mergeLatLng(coord.lat, coord.lng);
+    });
+
+    map.getViewModel().setLookAtData({
+      bounds: bounds
+    }, true);
+  }
+
+  // Dibujar ruta en el mapa
+  drawRoute(map: any, waypoints: { lat: number; lng: number }[]): any {
+    if (!waypoints || waypoints.length < 2) return null;
+
+    const lineString = new H.geo.LineString();
+    waypoints.forEach(point => {
+      lineString.pushPoint({ lat: point.lat, lng: point.lng });
+    });
+
+    const routeLine = new H.map.Polyline(lineString, {
+      style: {
+        strokeColor: 'rgba(0, 128, 255, 0.7)',
+        lineWidth: 4
+      }
+    });
+
+    map.addObject(routeLine);
+    return routeLine;
+  }
+
+  // Crear marcador personalizado
+  createCustomMarker(lat: number, lng: number, iconHtml: string, data?: any): any {
+    const icon = new H.map.DomIcon(iconHtml);
+    const marker = new H.map.DomMarker({ lat, lng }, {
+      icon: icon,
+      data: data
+    });
+
+    return marker;
+  }
 }
