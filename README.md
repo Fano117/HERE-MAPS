@@ -1,42 +1,83 @@
-# HERE Maps - Gestión de Direcciones y Rastreo
+# HERE Maps - Sistema de Entregas y Rastreo en Tiempo Real
 
-Sistema completo para gestión de direcciones con validación automática y rastreo en tiempo real usando HERE Maps API.
+Sistema completo para gestión de entregas con seguimiento en tiempo real, geocercas automáticas, y validación de direcciones usando HERE Maps API.
 
-## Características
+## 🚀 Características Principales
 
-### Frontend (Angular 20)
-- **Gestión de Direcciones**: Validación automática de direcciones ingresadas
-- **Selección en Mapa**: Corrección manual de direcciones mediante interfaz de mapa interactivo
+### Sistema de Entregas en Tiempo Real
+- **Seguimiento de Choferes**: Visualización en tiempo real de todos los choferes activos por almacén
+- **Geocercas Automáticas**: Detección de proximidad con radio de 200m para notificaciones
+- **Rutas Optimizadas**: Cálculo automático de rutas usando HERE Routing API v8
+- **Notificaciones**: Sistema de alertas por SMS/Email/WhatsApp
+- **WebSocket**: Actualizaciones en tiempo real con latencia < 2 segundos
+- **Simulación**: Herramientas de testing con 3 rutas predefinidas
+
+### Gestión de Direcciones
+- **Validación Automática**: Geocodificación y validación de direcciones
+- **Selección en Mapa**: Corrección manual mediante interfaz interactiva
 - **Almacenamiento**: Guardado local de direcciones validadas con coordenadas
-- **Rastreo en Tiempo Real**: Visualización de ubicación de conductores en tiempo real
+- **Análisis de Cobertura**: Visualización de polígonos de cobertura
+
+### Rastreo en Tiempo Real
+- **Visualización de ubicación** de conductores en tiempo real
 - **Rutas de Entrega**: Seguimiento de progreso en puntos de entrega
+- **Geocercas**: Círculos de 200m alrededor de cada punto de entrega
+- **ETA Dinámico**: Cálculo automático de tiempo estimado de llegada
 
-### Backend (Express.js)
-- **Simulación de Rastreo**: API para simular movimiento de conductores
-- **Endpoints RESTful**: GET/POST para manejo de ubicaciones y rutas
-- **Datos Dummy**: Sistema de simulación con rutas predefinidas
+## 📋 Documentación Completa
 
-## Instalación
+- **[Sistema de Entregas](DELIVERY_TRACKING_SYSTEM.md)** - Guía completa del sistema de entregas
+- **[API Documentation](API_DOCUMENTATION.md)** - Referencia completa de endpoints
+- **[React Native Implementation](REACT_NATIVE_IMPLEMENTATION.md)** - Integración móvil
+
+## 🛠️ Stack Tecnológico
+
+### Frontend (Angular 18)
+- Angular 18 con componentes standalone
+- HERE Maps API for JavaScript v3.1
+- Socket.IO Client para WebSocket
+- RxJS para manejo reactivo de datos
+- TypeScript 5.4
+
+### Backend (Node.js/Express)
+- Express.js 4.18
+- Socket.IO para comunicación en tiempo real
+- Geolib para cálculos geoespaciales
+- Axios para integración con HERE Maps API
+- CORS habilitado
+
+### APIs Externas
+- **HERE Maps API**: Mapas, geocodificación, routing
+- **HERE Routing API v8**: Cálculo de rutas optimizadas
+- **Integración preparada para FultraTrack API**
+
+## 📦 Instalación Rápida
 
 ### Prerequisitos
-- Node.js (v18 o superior)
-- npm
+- Node.js v18 o superior
+- npm v8 o superior
 
-### 1. Instalar dependencias del Frontend
+### 1. Clonar el Repositorio
+```bash
+git clone https://github.com/Fano117/HERE-MAPS.git
+cd HERE-MAPS
+```
 
+### 2. Instalar Dependencias
+
+Frontend:
 ```bash
 npm install
 ```
 
-### 2. Instalar dependencias del Backend
-
+Backend:
 ```bash
 cd backend
 npm install
 cd ..
 ```
 
-## Configuración
+## ⚙️ Configuración
 
 ### Credenciales HERE Maps
 Las credenciales ya están configuradas en el código:
@@ -44,27 +85,61 @@ Las credenciales ya están configuradas en el código:
 - **App ID**: 7LVwgFjjHhNtTtROLWKD
 - **API Key**: GYo3JTyTU2DjUu_dGyaDc2LIZyANv1zL5-Lot729yhw
 
-### Archivos de Configuración
-- `src/app/services/here-maps.service.ts`: Configuración del API Key
-- `backend/config.js`: Configuración del backend
+Archivo de configuración: `src/environments/environment.ts`
 
-## Ejecución
+## 🚀 Ejecución
 
-### Iniciar Frontend (Angular)
+### Opción 1: Ejecutar Ambos Servicios
+
+Terminal 1 - Backend:
+```bash
+cd backend
+npm start
+```
+El backend estará disponible en: `http://localhost:3000`
+
+Terminal 2 - Frontend:
 ```bash
 npm start
 ```
 El frontend estará disponible en: `http://localhost:4200`
 
-### Iniciar Backend (Express.js)
+### Opción 2: Script Unificado
 ```bash
-npm run start:backend
+# Iniciar backend en segundo plano
+npm run start:backend &
+
+# Iniciar frontend
+npm start
 ```
-El backend estará disponible en: `http://localhost:3000`
 
-## Uso
+## 🎯 Uso del Sistema
 
-### 1. Gestión de Direcciones (`/address`)
+### 1. Reportes de Entregas (`/reportes/entregas`)
+
+**Vista Principal del Sistema**
+
+Funcionalidades:
+- Selector de almacén (Central, Norte, Sur)
+- Lista de choferes activos con estado en tiempo real
+- Mapa interactivo mostrando:
+  * Posición de choferes (marcadores azules numerados)
+  * Rutas calculadas (líneas azules)
+  * Geocercas de 200m (círculos semitransparentes)
+  * Puntos de entrega (marcadores de colores según estado)
+- Panel lateral con:
+  * Detalles de entregas pendientes
+  * ETA calculado automáticamente
+  * Botón para enviar notificación manual
+
+**Iniciar Simulación:**
+1. Abrir `/reportes/entregas`
+2. Clic en "Iniciar Simulación"
+3. El sistema simulará 3 choferes con rutas predefinidas
+4. Actualización cada 2 segundos
+5. Velocidad: 60 km/h
+
+### 2. Gestión de Direcciones (`/address`)
 
 #### Validación Automática
 1. Ingresa una dirección en el campo de texto
@@ -77,17 +152,12 @@ El backend estará disponible en: `http://localhost:3000`
 - **Incorrecta**: `S155-CUA James Watt 35, , ,MEX,54730.`
 
 #### Selección Manual en Mapa
-1. Haz clic en cualquier punto del mapa para obtener la dirección
-2. El sistema realizará geocodificación reversa
+1. Haz clic en cualquier punto del mapa
+2. El sistema realiza geocodificación reversa
 3. Selecciona la dirección sugerida
 4. Guarda la dirección con coordenadas
 
-#### Gestión de Direcciones Guardadas
-- Ver lista de direcciones almacenadas
-- Visualizar en mapa
-- Eliminar direcciones
-
-### 2. Rastreo en Tiempo Real (`/tracking`)
+### 3. Rastreo en Tiempo Real (`/tracking`)
 
 #### Configuración del Rastreo
 1. Selecciona un conductor del dropdown:
@@ -96,98 +166,171 @@ El backend estará disponible en: `http://localhost:3000`
    - Carlos López (driver3)
 
 2. Presiona "Iniciar Rastreo"
-3. El sistema comenzará a simular movimiento cada 5 segundos
+3. El sistema simula movimiento cada 5 segundos
 
 #### Visualización
-- **Mapa**: Muestra ubicación actual del conductor (marcador azul)
-- **Puntos de Entrega**: Marcadores numerados (rojo: pendiente, verde: completado)
-- **Información**: Coordenadas, velocidad, dirección actual
+- **Mapa**: Ubicación actual del conductor (marcador azul)
+- **Puntos de Entrega**: Marcadores numerados
+  * Rojo: pendiente
+  * Verde: completado
+- **Información**: Coordenadas, velocidad, dirección
 - **Distancias**: Cálculo automático a puntos de entrega
 
-#### Estados de Entrega
-- Los puntos se marcan como completados automáticamente cuando el conductor está a menos de 100m
-- Visualización del progreso de la ruta
+## 📡 API Endpoints
 
-## API Endpoints del Backend
+### Rutas de Choferes
+- `GET /api/routes/chofer/:choferId` - Obtener ruta
+- `POST /api/routes/chofer/:choferId` - Actualizar ruta
 
-### Ubicaciones
-- `GET /api/location/:driverId` - Obtener ubicación actual
-- `POST /api/location/:driverId` - Actualizar ubicación manual
+### Geocercas
+- `POST /api/geofence/check` - Verificar proximidad
+- `POST /api/geofence/setup` - Configurar geocercas
 
-### Rutas
-- `GET /api/routes/:driverId` - Obtener ruta del conductor
-- `POST /api/routes/:driverId` - Actualizar ruta de entrega
+### Seguimiento
+- `POST /api/tracking/update` - Actualizar ubicación
+- `GET /api/tracking/live/:almacenId` - Obtener ubicaciones en vivo
+
+### Notificaciones
+- `POST /api/notifications/proximity` - Notificar cliente
+- `POST /api/notifications/alert` - Alertar encargado
 
 ### Simulación
-- `GET /api/simulation/start/:driverId` - Iniciar simulación automática
-- `GET /api/simulation/stop/:driverId` - Detener simulación
+- `GET /api/simulation/routes` - Obtener rutas predefinidas
+- `POST /api/simulation/start` - Iniciar simulación
+- `POST /api/simulation/stop/:choferId` - Detener simulación
 
-## Estructura del Proyecto
+Ver [API_DOCUMENTATION.md](API_DOCUMENTATION.md) para detalles completos.
+
+## 🔌 WebSocket
+
+### Conexión
+```javascript
+const socket = io('http://localhost:3000');
+```
+
+### Eventos Disponibles
+- `chofer_movimiento` - Actualización de posición
+- `chofer_geocerca` - Evento de geocerca
+- `entrega_completada` - Entrega finalizada
+- `notificacion_enviada` - Notificación enviada
+- `alerta_embarque` - Alerta para encargado
+
+## 🏗️ Estructura del Proyecto
 
 ```
-here-maps-angular/
-├── src/
+HERE-MAPS/
+├── src/ (Angular Frontend - Puerto 4200)
 │   ├── app/
 │   │   ├── components/
-│   │   │   ├── address-management/
-│   │   │   └── tracking-view/
-│   │   └── services/
-│   │       ├── here-maps.service.ts
-│   │       └── address.service.ts
-│   └── ...
-├── backend/
-│   ├── services/
-│   │   ├── locationService.js
-│   │   └── routeService.js
-│   ├── server.js
-│   └── config.js
-└── REACT_NATIVE_IMPLEMENTATION.md
+│   │   │   ├── reportes-entregas/      # Sistema principal de entregas
+│   │   │   ├── tracking-view/          # Rastreo individual
+│   │   │   ├── address-management/     # Gestión de direcciones
+│   │   │   └── coverage/               # Análisis de cobertura
+│   │   ├── services/
+│   │   │   ├── here-maps.service.ts    # Integración HERE Maps
+│   │   │   ├── tracking.service.ts     # Seguimiento
+│   │   │   ├── websocket.service.ts    # WebSocket
+│   │   │   └── address.service.ts      # Direcciones
+│   │   └── environments/
+│   └── assets/
+└── backend/ (Node.js/Express - Puerto 3000)
+    ├── controllers/
+    │   ├── choferRoutesController.js   # Rutas de choferes
+    │   ├── geofenceController.js       # Geocercas
+    │   ├── trackingController.js       # Seguimiento tiempo real
+    │   ├── notificationsController.js  # Notificaciones
+    │   └── simulationController.js     # Simulación
+    ├── services/
+    │   ├── locationService.js          # Ubicaciones
+    │   ├── routeService.js             # Rutas
+    │   └── coverageService.js          # Cobertura
+    └── server.js                       # Servidor con WebSocket
 ```
 
-## Implementación en React Native
+## 🧪 Testing
 
-Ver el archivo `REACT_NATIVE_IMPLEMENTATION.md` para instrucciones detalladas sobre cómo implementar el sistema en React Native usando HERE SDK.
+### Build del Proyecto
+```bash
+npm run build
+```
 
-### Funcionalidades para Móvil
-- Recepción de coordenadas desde la aplicación Angular
-- Visualización de puntos de entrega en mapa nativo
-- Rastreo GPS del dispositivo móvil
-- Sincronización en tiempo real con el backend
+### Simulación de Rutas
+El sistema incluye 3 rutas predefinidas en Ciudad de México:
 
-## Consideraciones Técnicas
+1. **Ruta Centro - Norte**: Zócalo → Santa María la Ribera (5 puntos)
+2. **Ruta Sur - Poniente**: CU → Santa Fe (5 puntos)
+3. **Ruta Oriente**: Indios Verdes → Tlatelolco (5 puntos)
 
-### Frontend
-- Angular 20 con sintaxis moderna
-- Componentes standalone
-- Servicios reactivos con RxJS
-- Almacenamiento local con localStorage
+### Pruebas con cURL
 
-### Backend
-- Express.js con simulación de datos
-- Endpoints RESTful siguiendo estándares
-- Simulación de rutas con interpolación de coordenadas
-- Manejo de múltiples conductores simultáneos
+Verificar geocerca:
+```bash
+curl -X POST http://localhost:3000/api/geofence/check \
+  -H "Content-Type: application/json" \
+  -d '{"choferId": 1, "lat": 19.4326, "lng": -99.1332}'
+```
 
-### HERE Maps Integration
-- Geocodificación directa e inversa
-- Validación automática de direcciones
-- Mapas interactivos con marcadores
-- Cálculo de distancias y rutas
+Iniciar simulación:
+```bash
+curl -X POST http://localhost:3000/api/simulation/start \
+  -H "Content-Type: application/json" \
+  -d '{"choferId": 1, "rutaId": 1, "velocidad": 60}'
+```
 
-## Mejores Prácticas Implementadas
+## 📊 Criterios de Éxito
 
-1. **Arquitectura Modular**: Separación clara entre servicios y componentes
-2. **Manejo de Errores**: Validación y mensajes informativos al usuario
-3. **Responsividad**: Interfaz adaptable a diferentes tamaños de pantalla
-4. **Performance**: Actualizaciones eficientes del mapa y marcadores
-5. **UX/UI**: Interfaz intuitiva con feedback visual claro
+- ✅ Actualización de mapas en tiempo real (< 2 segundos)
+- ✅ Precisión de geocodificación > 95%
+- ✅ Detección de geocerca en < 500ms
+- ✅ ETA con margen de error < 10%
+- ✅ Interfaz responsive (desktop + tablet)
+- ✅ Manejo de 50+ choferes simultáneos
 
-## Próximos Pasos
+## 🔐 Consideraciones de Seguridad
 
-Para implementación en producción:
+### Desarrollo
+- API Keys en código para desarrollo rápido
+- CORS abierto para localhost
 
-1. **Seguridad**: Mover API Keys a variables de entorno
-2. **Base de Datos**: Implementar persistencia real (MongoDB/PostgreSQL)
-3. **Autenticación**: Sistema de login para conductores y administradores
-4. **Notificaciones**: Push notifications para eventos importantes
-5. **Optimizaciones**: Cache de direcciones y optimización de consultas
+### Producción (Recomendado)
+```bash
+# .env
+HERE_MAPS_API_KEY=your_key_here
+BACKEND_PORT=3000
+NODE_ENV=production
+```
+
+1. Mover API Keys a variables de entorno
+2. Implementar autenticación JWT
+3. Configurar CORS restrictivo
+4. Usar HTTPS
+5. Implementar rate limiting
+
+## 📱 Integración Móvil
+
+Ver [REACT_NATIVE_IMPLEMENTATION.md](REACT_NATIVE_IMPLEMENTATION.md) para integración con FultraApps móvil.
+
+## 🔄 Próximos Pasos
+
+- [ ] Base de datos persistente (MongoDB/PostgreSQL)
+- [ ] Autenticación de usuarios
+- [ ] Notificaciones push reales (Twilio, SendGrid)
+- [ ] Optimización de rutas con HERE Fleet Telematics
+- [ ] Dashboard de análitics
+- [ ] Integración completa con FultraTrack API
+
+## 🤝 Contribución
+
+Este proyecto es parte del sistema FultraTrack. Para contribuir, contactar al equipo de desarrollo.
+
+## 📄 Licencia
+
+Desarrollado para FultraTrack como sistema de gestión de entregas.
+
+---
+
+**Versión**: 1.0.0  
+**Última actualización**: Noviembre 2025  
+**Puerto Frontend**: 4200  
+**Puerto Backend**: 3000
+
