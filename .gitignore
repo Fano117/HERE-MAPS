@@ -5,7 +5,7 @@ dist/
 .vscode/
 *.tmp
 *.temp
-coverage/
+/coverage/
 *.coverage
 
 # Backend
