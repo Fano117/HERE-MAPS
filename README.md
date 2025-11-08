@@ -2,19 +2,29 @@
 
 Sistema completo para gestión de direcciones con validación automática y rastreo en tiempo real usando HERE Maps API.
 
+## 📚 Documentación Adicional
+
+- **[INTEGRACIONES.md](./INTEGRACIONES.md)** - Listado completo de todas las integraciones, funcionalidades y ubicación de cada componente
+- **[EJEMPLOS.md](./EJEMPLOS.md)** - Guía práctica con ejemplos de uso de la tecnología de navegación HERE Maps
+- **[REACT_NATIVE_IMPLEMENTATION.md](./REACT_NATIVE_IMPLEMENTATION.md)** - Guía para implementar en React Native
+
 ## Características
 
-### Frontend (Angular 20)
+### Frontend (Angular 18)
 - **Gestión de Direcciones**: Validación automática de direcciones ingresadas
 - **Selección en Mapa**: Corrección manual de direcciones mediante interfaz de mapa interactivo
 - **Almacenamiento**: Guardado local de direcciones validadas con coordenadas
 - **Rastreo en Tiempo Real**: Visualización de ubicación de conductores en tiempo real
 - **Rutas de Entrega**: Seguimiento de progreso en puntos de entrega
+- **Optimización de Rutas**: Cálculo de rutas optimizadas con múltiples puntos de entrega
+- **Análisis de Cobertura**: Definición y gestión de áreas de cobertura mediante polígonos
 
 ### Backend (Express.js)
 - **Simulación de Rastreo**: API para simular movimiento de conductores
 - **Endpoints RESTful**: GET/POST para manejo de ubicaciones y rutas
 - **Datos Dummy**: Sistema de simulación con rutas predefinidas
+- **Gestión de Polígonos**: CRUD de áreas de cobertura
+- **Análisis Punto-en-Polígono**: Verificación de cobertura de direcciones
 
 ## Instalación
 
@@ -108,6 +118,26 @@ El backend estará disponible en: `http://localhost:3000`
 - Los puntos se marcan como completados automáticamente cuando el conductor está a menos de 100m
 - Visualización del progreso de la ruta
 
+### 3. Análisis de Cobertura (`/coverage`)
+
+#### Crear Áreas de Cobertura
+1. Haz clic en "Crear Nuevo Polígono"
+2. Ingresa un nombre para el área (ej: "Zona Centro", "Zona Norte")
+3. Haz clic en el mapa para agregar puntos del polígono (mínimo 3 puntos)
+4. Haz clic en "Finalizar Polígono" para guardar
+
+#### Verificar Cobertura
+1. Con polígonos creados, haz clic en cualquier punto del mapa
+2. El sistema mostrará:
+   - ✅ Si el punto está dentro de un área de cobertura
+   - ❌ Si está fuera y la distancia al área más cercana
+   - ℹ️ Si no hay áreas definidas
+
+#### Gestión de Polígonos
+- Ver todos los polígonos creados
+- Enfocar polígono en el mapa
+- Eliminar polígonos existentes
+
 ## API Endpoints del Backend
 
 ### Ubicaciones
@@ -122,6 +152,16 @@ El backend estará disponible en: `http://localhost:3000`
 - `GET /api/simulation/start/:driverId` - Iniciar simulación automática
 - `GET /api/simulation/stop/:driverId` - Detener simulación
 
+### Cobertura
+- `GET /api/coverage` - Obtener todos los polígonos de cobertura
+- `POST /api/coverage` - Crear nuevo polígono de cobertura
+- `POST /api/coverage/:id` - Actualizar polígono existente
+- `POST /api/coverage/delete/:id` - Eliminar polígono
+
+### Análisis de Polígonos
+- `POST /api/polygon-analysis/address` - Analizar si una dirección está en cobertura
+- `POST /api/polygon-analysis/point` - Analizar si un punto está en cobertura
+
 ## Estructura del Proyecto
 
 ```
@@ -130,17 +170,23 @@ here-maps-angular/
 │   ├── app/
 │   │   ├── components/
 │   │   │   ├── address-management/
-│   │   │   └── tracking-view/
+│   │   │   ├── tracking-view/
+│   │   │   └── coverage/
 │   │   └── services/
 │   │       ├── here-maps.service.ts
-│   │       └── address.service.ts
+│   │       ├── address.service.ts
+│   │       └── polygon-analysis.service.ts
 │   └── ...
 ├── backend/
 │   ├── services/
 │   │   ├── locationService.js
-│   │   └── routeService.js
+│   │   ├── routeService.js
+│   │   ├── coverageService.js
+│   │   └── polygonAnalysisService.js
 │   ├── server.js
 │   └── config.js
+├── INTEGRACIONES.md
+├── EJEMPLOS.md
 └── REACT_NATIVE_IMPLEMENTATION.md
 ```
 
